@@ -142,7 +142,11 @@ class App {
 				window.editor_user_auth.logout();
 			}
 
-			window.editor_user = null;
+			window.editor_user = {
+        id: '1234',
+        name: 'Abdullah',
+        auth: 'AUTH',
+      };
 			localStorage.removeItem("oauth_token");
 
 			/**

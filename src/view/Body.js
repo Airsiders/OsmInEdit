@@ -384,17 +384,17 @@ class Body extends Component {
 
 	componentDidMount() {
 		this._timerImagery = setInterval(() => this._updateImagery(), 1000);
-		this._checkUserLoggedIn();
-
-		// Hide login dialog when user logs in if previously shown
-		PubSub.subscribe("app.user.ready", (msg, data) => {
-			this._checkUserLoggedIn();
-		});
-
-		// Show login dialog after logout if necessary
-		PubSub.subscribe("app.user.left", (msg, data) => {
-			this._checkUserLoggedIn();
-		});
+		// this._checkUserLoggedIn();
+    //
+		// // Hide login dialog when user logs in if previously shown
+		// PubSub.subscribe("app.user.ready", (msg, data) => {
+		// 	this._checkUserLoggedIn();
+		// });
+    //
+		// // Show login dialog after logout if necessary
+		// PubSub.subscribe("app.user.left", (msg, data) => {
+		// 	this._checkUserLoggedIn();
+		// });
 
 		/**
 		 * Event for changing view mode (what kind of features is shown)
@@ -1525,7 +1525,7 @@ class Body extends Component {
 		}
 
 		// Check user status
-		this._checkUserLoggedIn();
+		// this._checkUserLoggedIn();
 
 		// Auto-select single floor imagery if only 1 defined
 		// NOTE : should be kept as last check

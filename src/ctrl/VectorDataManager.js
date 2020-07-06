@@ -71,39 +71,12 @@ class VectorDataManager extends HistorizedManager {
 	 */
 	loadOSMData(bbox) {
 		return new Promise((resolve, reject) => {
-			//If data is cached, no need to download again
-			if(this._cacheBbox && this._cacheBbox.filter(b => b.contains(bbox)).length > 0) {
-				resolve(true);
-			}
-
-			const restoreEdits = this._cacheOsmXml !== null;
-
-			// Accumulate retrieved data
-			this._osmApi
-			.fetchMapByBbox(bbox.getWest(), bbox.getSouth(), bbox.getEast(), bbox.getNorth(), "both")
+      fetch('http://localhost:3000/airport-mapping/airports/TES/pois')
+      .then(response => response.json())
 			.then(res => {
-				const [mapJson, mapXml] = res;
-				this._appendOsmXml(mapJson, mapXml, bbox);
-
-				if(
-					(this._cacheOsmJson.node && this._cacheOsmJson.node.length > 0)
-					|| (this._cacheOsmJson.way && this._cacheOsmJson.way.length > 0)
-					|| (this._cacheOsmJson.relation && this._cacheOsmJson.relation.length > 0)
-				) {
-					this._cacheOsmGeojson = this.getBaseCollection();
-				}
-				else {
-					this._cacheOsmGeojson = { type: "FeatureCollection", features: [] };
-				}
-
-				// Restore all edits made by user
-				if(restoreEdits) {
-					this._nextId = -1;
-					for(let i=0; i <= this._lastActionId; i++) {
-						this._do(this._actions[i], true);
-					}
-				}
-
+        this._cacheOsmGeojson = res
+        this._cacheOsmGeojsonOnFetch = JSON.parse(JSON.stringify(this._cacheOsmGeojson))
+  			this._cacheBbox = null;
 				resolve(true);
 			})
 			.catch(e => {
@@ -1168,7 +1141,7 @@ class VectorDataManager extends HistorizedManager {
 	 * @return The original GeoJSON collection (without edits)
 	 */
 	getBaseCollection() {
-		return this._completeGeoJSON(osmtogeojson(this._cacheOsmXml, { flatProperties: false, uninterestingTags: () => false }));
+		return this._cacheOsmGeojsonOnFetch;
 	}
 
 	/**
@@ -1197,78 +1170,20 @@ class VectorDataManager extends HistorizedManager {
 	 * @return {Promise} Resolves on changeset ID if succeed
 	 */
 	async sendOSMData(tags) {
-		if(window.editor_user && window.editor_user_auth) {
-			const diff = await this.computeDiff();
+    console.log(this._cacheOsmGeojson, JSON.stringify(this._cacheOsmGeojson))
+    const rawResponse = await fetch('http://localhost:3000/airport-mapping/airports/TES/pois', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(this._cacheOsmGeojson)
+    });
+    console.log(rawResponse);
+    // const content = await rawResponse.json();
+    // console.log(content);
 
-			// Set authentication info
-			this._osmApi._auth = window.editor_user_auth;
-
-			// Create changeset
-			const mytags = Object.assign({ host: window.EDITOR_URL, locale: I18n.locale }, tags);
-			delete mytags.comment;
-
-			let changesetId = null;
-
-			try {
-				changesetId = await this._osmApi.createChangeset(
-					window.EDITOR_NAME+' '+PACKAGE.version,
-					tags.comment || I18n.t("Edited building indoors"),
-					mytags
-				);
-			}
-			catch(e) {
-				return new Error("Changeset creation failed");
-			}
-
-			try {
-				if(changesetId) {
-					const newElementsIds = {};
-
-					// Sort operations in order to avoid dependency rejections from API
-					const order = [
-						"node-created", "node-edited",
-						"way-created", "way-edited",
-						"relation-created", "relation-edited",
-						"relation-deleted", "way-deleted", "node-deleted"
-					];
-					const orderFeat = e => (order.indexOf(e[0].split("/")[0] + "-" + (e[1].deleted ? "deleted" : (e[1].created ? "created" : "edited"))));
-					const sort = (a, b) => (orderFeat(a) - orderFeat(b));
-					const entries = Object.entries(diff).sort(sort);
-
-					// Apply diff and send nodes to API
-					for(const e of entries) {
-						const [ elemId, elemDiff ] = e;
-						const element = await this._transformDiffIntoElements(elemId, elemDiff, newElementsIds);
-
-						if(element) {
-							const res = await this._sendElementToApi(elemId, elemDiff, element, newElementsIds, changesetId);
-							if(!res) {
-								return new Error("Can't upload element", elemId);
-							}
-						}
-						else {
-							console.warn("No element found for", e);
-						}
-					}
-
-					// Close changeset
-					await this._osmApi.closeChangeset(changesetId);
-					this._disableBeforeUnload();
-
-					return changesetId;
-				}
-				else {
-					return new Error("Can't create changeset");
-				}
-			}
-			catch(e) {
-				return e;
-			}
-		}
-		else {
-			console.error("You should be authenticated before sending your changes");
-			return new Error("Not authenticated");
-		}
+		return 1
 	}
 
 	/**
@@ -1567,6 +1482,7 @@ class VectorDataManager extends HistorizedManager {
 							fPrev = prevFeaturesById[fNext.id];
 
 							if(fPrev && deepEqual(fPrev.geometry, fNext.geometry)) {
+                console.log(fNext);
 								fNext.properties.own.nodes.filter(nId => !fixedNodesIds.has(nId)).forEach(nId => {
 									const nNext = nextFeaturesById[nId];
 									if(nNext) {
